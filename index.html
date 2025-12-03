@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Crypto Волк — демо</title>
+  
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+  <style>
+    /* ПЕРЕМЕННЫЕ ЦВЕТА */
+    :root {
+      /* Переменные будут перезаписаны цветами Telegram, если они доступны, 
+         но могут быть переопределены классами body.dark/body.light */
+      --bg: #020617;
+      --bg-gradient: radial-gradient(circle at top, #1e293b 0, #020617 55%);
+      --card-bg: #020617;
+      --card-border: #1f2937;
+      --text-main: #e5e7eb;
+      --text-muted: #9ca3af;
+      --accent: #facc15;
+      --accent-soft: rgba(250, 204, 21, 0.12);
+      --button-bg: #111827;
+      --button-bg-hover: #1f2937;
+      --shadow-soft: 0 20px 40px rgba(0,0,0,0.5);
+
+      /* Цвета для Canvas в темной теме */
+      --canvas-bg-top: #020617;
+      --canvas-bg-bottom: #0b1120;
+      --canvas-ground-line: rgba(148,163,184,0.3);
+      --canvas-wolf-color: #e5e7eb;
+      --canvas-token-ring: rgba(250, 204, 21, 0.2);
+      --canvas-token-color: #facc15;
+      --canvas-token-stripe: #1f2937;
+      --canvas-ui-color: #e5e7eb;
+      --canvas-bonus-color-slow: #a7f3d0;
+      --canvas-bonus-color-magnet: #67e8f9;
+
+      /* Цвета для Магазина */
+      --shop-bg: #111827;
+      --shop-border: #1f2937;
+      --shop-item-bg: #0f172a;
+      --shop-item-bg-hover: #1e293b;
+      --shop-cost-color: #facc15;
+      --shop-icon-color: #a7f3d0;
+    }
+
+    body.light {
+      --bg: #f3f4f6;
+      --bg-gradient: radial-gradient(circle at top, #e5e7eb 0, #f3f4f6 55%);
+      --card-bg: #ffffff;
+      --card-border: #e5e7eb;
+      --text-main: #111827;
+      --text-muted: #6b7280;
+      --accent: #f97316;
+      --accent-soft: rgba(249, 115, 22, 0.08);
+      --button-bg: #f3f4f6;
+      --button-bg-hover: #e5e7eb;
+      --shadow-soft: 0 16px 32px rgba(15,23,42,0.16);
+
+      /* Цвета для Canvas в светлой теме */
+      --canvas-bg-top: #0f172a;
+      --canvas-bg-bottom: #1f2937;
+      --canvas-ground-line: rgba(255,255,255,0.2);
+      --canvas-wolf-color: #ffffff;
+      --canvas-token-ring: rgba(249,115,22,0.2);
+      --canvas-token-color: #f97316;
+      --canvas-token-stripe: #e5e7eb;
+      --canvas-ui-color: #f3f4f6;
+      --canvas-bonus-color-slow: #10b981;
+      --canvas-bonus-color-magnet: #0ea5e9;
+
+      /* Цвета для Магазина */
+      --shop-bg: #ffffff;
+      --shop-border: #e5e7eb;
+      --shop-item-bg: #f9fafb;
+      --shop-item-bg-hover: #e5e7eb;
+      --shop-cost-color: #f97316;
+      --shop-icon-color: #10b981;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center; /* Центрирует по вертикали на десктопе */
+      justify-content: center; /* Центрирует по горизонтали */
+      background: var(--bg-gradient); 
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text-main);
+      transition: background 0.4s ease;
+      -webkit-user-select: none; 
+      user-select: none;
+    }
+
+    .app-frame {
+      width: 580px; 
+      max-width: 100%;
+      background: var(--card-bg);
+      border-radius: 28px;
+      border: 1px solid var(--card-border);
+      box-shadow: var(--shadow-soft);
+      padding: 14px 16px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* АДАПТАЦИЯ ДЛЯ МОБИЛЬНЫХ (СТИЛЬ, КОТОРЫЙ ВАМ ПОНРАВИЛСЯ) */
+    @media (max-width: 650px) {
+        .app-frame {
+            width: 100%; 
+            border-radius: 0;
+            border-left: none;
+            border-right: none;
+            border-top: none;
+            padding: 10px;
+            box-shadow: none;
+        }
+        body {
+            align-items: flex-start; /* Прижимает к верху в ТГ */
+            padding-top: 0;
+        }
+    }
+
+    /* --- НОВЫЙ СТИЛЬ: ДЛЯ ОТОБРАЖЕНИЯ ЖИЗНЕЙ --- */
+    .lives-container {
+        display: flex;
+        gap: 4px;
+        position: absolute; 
+        top: 20px;
+        left: 20px;
+        z-index: 10;
+        background: rgba(0,0,0,0.7);
+        padding: 4px 8px;
+        border-radius: 8px;
+    }
+    .life-icon {
+        font-size: 14px;
+        line-height: 1;
+        transition: opacity 0.2s;
+    }
+    /* ------------------------------------------- */
+
+    /* ... (Остальные стили CSS из вашего файла) ... */
+    .app-glow {
+      position: absolute;
+      inset: -60%;
+      background:
+        radial-gradient(circle at 10% 0%, rgba(56,189,248,0.12) 0, transparent 55%),
+        radial-gradient(circle at 90% 10%, rgba(250,204,21,0.10) 0, transparent 55%);
+      pointer-events: none;
+      mix-blend-mode: screen;
+      opacity: 0.65;
+    }
+
+    .app-header {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      z-index: 1;
+    }
+
+    .title-block {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .title-main {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .title-pill {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      padding: 2px 6px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+
+    .title-sub {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .balance-pill {
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(15,23,42,0.65);
+      border: 1px solid rgba(148,163,184,0.35);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      backdrop-filter: blur(10px);
+    }
+
+    body.light .balance-pill {
+      background: rgba(255,255,255,0.9);
+      border-color: rgba(209,213,219,0.9);
+    }
+
+    .balance-label {
+      color: var(--text-muted);
+      font-size: 10px;
+    }
+
+    .balance-value {
+      font-weight: 600;
+      display: flex;
+      align-items: baseline;
+      gap: 3px;
+    }
+
+    .balance-currency {
+      font-size: 9px;
+      opacity: 0.8;
+    }
+
+    .icon-button {
+      border: none;
+      outline: none;
+      padding: 6px;
+      border-radius: 999px;
+      background: var(--button-bg);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background 0.15s ease, transform 0.12s ease;
+    }
+
+    .icon-button:hover {
+      background: var(--button-bg-hover);
+      transform: translateY(-1px);
+    }
+
+    .icon-button:active {
+      transform: translateY(0);
+      opacity: 0.9;
+    }
+
+    .icon-button span {
+      font-size: 15px;
+    }
+
+    .app-main {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 4px;
+    }
+
+    .game-card {
+      position: relative;
+      border-radius: 18px;
+      padding: 10px;
+      background: radial-gradient(circle at top, rgba(15,23,42,0.9) 0, rgba(15,23,42,0.98) 50%, #020617 100%);
+      border: 1px solid rgba(30,64,175,0.6);
+      overflow: hidden;
+    }
+
+    body.light .game-card {
+      background: radial-gradient(circle at top, #e5e7eb 0, #f9fafb 50%, #e5e7eb 100%);
+      border-color: rgba(209,213,219,0.9);
+    }
+
+    .game-top-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+
+    .game-top-left {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      background: #22c55e;
+      box-shadow: 0 0 0 4px rgba(34,197,94,0.25);
+    }
+
+    .game-tag {
+      padding: 2px 6px;
+      border-radius: 999px;
+      border: 1px solid rgba(148,163,184,0.5);
+    }
+
+    .game-top-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .stat-pill {
+      padding: 2px 6px;
+      border-radius: 999px;
+      background: rgba(15,23,42,0.8);
+      color: var(--accent);
+      border: 1px solid rgba(250,204,21,0.35);
+      font-weight: 600;
+    }
+
+    body.light .stat-pill {
+      background: rgba(255,255,255,0.88);
+      border-color: rgba(249,115,22,0.4);
+    }
+
+    .canvas-wrap {
+      background: #020617;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid rgba(15,23,42,0.8);
+      position: relative;
+    }
+
+    body.light .canvas-wrap {
+      background: #0f172a;
+      border-color: rgba(15,23,42,0.85);
+    }
+
+    canvas {
+      width: 100%;
+      height: auto;
+      image-rendering: pixelated;
+      display: block;
+    }
+
+    .game-bottom {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 6px;
+      gap: 8px;
+    }
+
+    .game-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      font-size: 10px;
+    }
+
+    .game-info-main {
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .game-info-sub {
+      color: var(--text-muted);
+    }
+
+    .primary-button {
+      flex-shrink: 0;
+      border: none;
+      outline: none;
+      border-radius: 999px;
+      padding: 7px 14px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      cursor: pointer;
+      background: linear-gradient(135deg, #fbbf24, #f97316);
+      color: #111827;
+      box-shadow: 0 10px 20px rgba(248,250,252,0.15);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: transform 0.12s ease, box-shadow 0.15s ease, filter 0.12s ease;
+    }
+
+    .primary-button:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.03);
+      box-shadow: 0 14px 24px rgba(248,250,252,0.18);
+    }
+
+    .primary-button:active {
+      transform: translateY(0);
+      box-shadow: 0 8px 14px rgba(15,23,42,0.3);
+      filter: brightness(0.98);
+    }
+
+    .primary-button span.icon {
+      font-size: 12px;
+    }
+
+    /* --- Стили для Магазина (Shop) --- */
+    .shop-section {
+      background: var(--shop-bg);
+      border-radius: 18px;
+      border: 1px solid var(--shop-border);
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .shop-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-main);
+      border-bottom: 1px solid var(--shop-border);
+      padding-bottom: 8px;
+      margin-bottom: 4px;
+    }
+
+    .shop-items {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .shop-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 4px;
+      border-radius: 10px;
+      background: var(--shop-item-bg); 
+      border: 1px solid var(--shop-border);
+      cursor: pointer;
+      transition: background 0.15s ease;
+      font-size: 10px;
+      font-weight: 600;
+      text-align: center;
+      gap: 4px;
+      color: var(--text-main); 
+    }
+
+    .shop-item:hover:not(:disabled) {
+        background: var(--shop-item-bg-hover);
+    }
+
+    .shop-item:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .item-icon {
+        font-size: 18px;
+        color: var(--shop-icon-color);
+    }
+
+    .item-cost {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        font-size: 9px;
+        color: var(--shop-cost-color);
+        font-weight: 700;
+    }
+
+    .footer-text {
+      font-size: 9px;
+      color: var(--text-muted);
+      text-align: center;
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body class="dark">
+  <div class="app-frame">
+    <div class="app-glow"></div>
+
+    <header class="app-header">
+      <div class="title-block">
+        <div class="title-main">
+          🐺 Crypto Волк
+          <span class="title-pill">mini app • beta</span>
+        </div>
+        <div class="title-sub">Лови токены, качай портфель</div>
+      </div>
+
+      <div class="header-actions">
+        <div class="balance-pill">
+          <div class="balance-label">Баланс</div>
+          <div class="balance-value">
+            <span id="balanceValue">0</span>
+            <span class="balance-currency">TOK</span>
+          </div>
+        </div>
+        <button class="icon-button" id="pauseButton" title="Пауза" style="display:none;">
+            <span id="pauseIcon">⏸</span>
+        </button>
+        <button class="icon-button" id="themeToggle" title="Переключить тему">
+          <span id="themeIcon">🌙</span>
+        </button>
+      </div>
+    </header>
+
+    <main class="app-main">
+      <section class="game-card">
+        <div class="game-top-bar">
+          <div class="game-top-left">
+            <div class="dot"></div>
+            <div class="game-tag">Arcade • 16-bit</div>
+          </div>
+          <div class="game-top-right">
+            <div class="stat-pill">
+              x<span id="multiplierValue">1.0</span>
+            </div>
+            <div>Лучший: <span id="bestScore">0</span></div>
+          </div>
+        </div>
+
+        <div class="canvas-wrap">
+            <div id="livesContainer" class="lives-container"></div> 
+            <canvas id="game" width="550" height="350"></canvas>
+        </div>
+
+        <div class="game-bottom">
+          <div class="game-info">
+            <div class="game-info-main" id="statusText">Нажми «Старт», чтобы играть</div>
+            <div class="game-info-sub">Управление: мышкой или свайпом по экрану</div>
+          </div>
+          <button class="primary-button" id="startButton">
+            <span class="icon">▶</span>
+            <span id="startButtonLabel">Старт</span>
+          </button>
+        </div>
+      </section>
+
+      <section class="shop-section">
+          <div class="shop-title">🛍️ Магазин бонусов (Действуют в игре)</div>
+          <div class="shop-items">
+              <button class="shop-item" id="buySlowTime" data-cost="50">
+                  <span class="item-icon">🐢</span>
+                  <span>Замедление (10с)</span>
+                  <div class="item-cost">50 <span class="balance-currency">TOK</span></div>
+              </button>
+              <button class="shop-item" id="buyMagnet" data-cost="75">
+                  <span class="item-icon">🧲</span>
+                  <span>Магнит (10с)</span>
+                  <div class="item-cost">75 <span class="balance-currency">TOK</span></div>
+              </button>
+              <button class="shop-item" id="buyLife" data-cost="100">
+                  <span class="item-icon">❤️</span>
+                  <span>Жизнь (+1)</span>
+                  <div class="item-cost">100 <span class="balance-currency">TOK</span></div>
+              </button>
+          </div>
+      </section>
+
+      <div class="footer-text">
+        Бонусы действуют 10 секунд. Максимум 5 жизней. Улучшения, задания и скины появятся позже.
+      </div>
+    </main>
+  </div>
+
+  <script>
+    function getCssVar(name) {
+      return getComputedStyle(document.body).getPropertyValue(name).trim(); 
+    }
+  </script>
+
+  <script src="token.js"></script> 
+  <script src="game.js"></script> 
+  <script src="ui.js"></script> 
+
+  <script>
+    // ⭐️ ЗАПУСК ИГРЫ
+    let GAME;
+    window.onload = () => {
+        // Запуск логики UI, тем и Telegram (из ui.js)
+        initializeThemeLogic(); 
+        
+        // Создание экземпляра игры (из game.js)
+        // Глобальная переменная GAME используется в ui.js для паузы/закрытия через кнопку "Назад" ТГ.
+        GAME = new CryptoWolfGame(); 
+        
+        // Добавление обработчиков покупок, так как кнопки в index.html
+        document.getElementById('buySlowTime').addEventListener('click', (e) => {
+            GAME.purchaseItem('slowtime', parseInt(e.currentTarget.dataset.cost));
+        });
+        document.getElementById('buyMagnet').addEventListener('click', (e) => {
+            GAME.purchaseItem('magnet', parseInt(e.currentTarget.dataset.cost));
+        });
+        document.getElementById('buyLife').addEventListener('click', (e) => {
+            GAME.purchaseItem('life', parseInt(e.currentTarget.dataset.cost));
+        });
+
+        // Запуск игрового цикла
+        GAME.loop();
+    };
+  </script>
+</body>
+</html>
