@@ -87,8 +87,8 @@
       margin: 0;
       min-height: 100vh;
       display: flex;
-      align-items: center; /* Центрирует по вертикали на десктопе */
-      justify-content: center; /* Центрирует по горизонтали */
+      align-items: center; 
+      justify-content: center; 
       background: var(--bg-gradient); 
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       color: var(--text-main);
@@ -124,7 +124,7 @@
             box-shadow: none;
         }
         body {
-            align-items: flex-start; /* Прижимает к верху в ТГ */
+            align-items: flex-start; 
             padding-top: 0;
         }
     }
@@ -148,7 +148,6 @@
     }
     /* ------------------------------------------- */
 
-    /* ... (Остальные стили CSS из вашего файла) ... */
     .app-glow {
       position: absolute;
       inset: -60%;
@@ -438,7 +437,7 @@
 
     .shop-items {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(1, 1fr); 
       gap: 8px;
     }
 
@@ -492,6 +491,11 @@
   </style>
 </head>
 <body class="dark">
+  <audio id="bgm" src="bgm.mp3" loop></audio>
+  <audio id="sfx-catch" src="sfx_catch.mp3"></audio>
+  <audio id="sfx-miss" src="sfx_miss.mp3"></audio>
+  <audio id="sfx-gameover" src="sfx_gameover.mp3"></audio>
+
   <div class="app-frame">
     <div class="app-glow"></div>
 
@@ -514,6 +518,9 @@
         </div>
         <button class="icon-button" id="pauseButton" title="Пауза" style="display:none;">
             <span id="pauseIcon">⏸</span>
+        </button>
+        <button class="icon-button" id="soundToggleButton" title="Включить/Выключить звук">
+            <span id="soundIcon">🔊</span>
         </button>
         <button class="icon-button" id="themeToggle" title="Переключить тему">
           <span id="themeIcon">🌙</span>
@@ -554,18 +561,8 @@
       </section>
 
       <section class="shop-section">
-          <div class="shop-title">🛍️ Магазин бонусов (Действуют в игре)</div>
+          <div class="shop-title">🛍️ Магазин (Покупка жизни)</div>
           <div class="shop-items">
-              <button class="shop-item" id="buySlowTime" data-cost="50">
-                  <span class="item-icon">🐢</span>
-                  <span>Замедление (10с)</span>
-                  <div class="item-cost">50 <span class="balance-currency">TOK</span></div>
-              </button>
-              <button class="shop-item" id="buyMagnet" data-cost="75">
-                  <span class="item-icon">🧲</span>
-                  <span>Магнит (10с)</span>
-                  <div class="item-cost">75 <span class="balance-currency">TOK</span></div>
-              </button>
               <button class="shop-item" id="buyLife" data-cost="100">
                   <span class="item-icon">❤️</span>
                   <span>Жизнь (+1)</span>
@@ -575,7 +572,7 @@
       </section>
 
       <div class="footer-text">
-        Бонусы действуют 10 секунд. Максимум 5 жизней. Улучшения, задания и скины появятся позже.
+        Бонусы (Замедление, Магнит) теперь падают с неба! Максимум 5 жизней.
       </div>
     </main>
   </div>
@@ -598,19 +595,15 @@
         initializeThemeLogic(); 
         
         // Создание экземпляра игры (из game.js)
-        // Глобальная переменная GAME используется в ui.js для паузы/закрытия через кнопку "Назад" ТГ.
         GAME = new CryptoWolfGame(); 
         
-        // Добавление обработчиков покупок, так как кнопки в index.html
-        document.getElementById('buySlowTime').addEventListener('click', (e) => {
-            GAME.purchaseItem('slowtime', parseInt(e.currentTarget.dataset.cost));
-        });
-        document.getElementById('buyMagnet').addEventListener('click', (e) => {
-            GAME.purchaseItem('magnet', parseInt(e.currentTarget.dataset.cost));
-        });
+        // Добавление обработчика покупки жизни 
         document.getElementById('buyLife').addEventListener('click', (e) => {
             GAME.purchaseItem('life', parseInt(e.currentTarget.dataset.cost));
         });
+        
+        // NEW: Обработчик soundToggleButton удален отсюда и перенесен в game.js/setupControls()
+        // чтобы гарантировать использование метода toggleSound() в контексте объекта GAME.
 
         // Запуск игрового цикла
         GAME.loop();

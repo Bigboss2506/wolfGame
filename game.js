@@ -101,13 +101,44 @@ class CryptoWolfGame {
         this.pauseButton = document.getElementById('pauseButton');
         this.pauseIcon = document.getElementById('pauseIcon');
         this.livesContainer = document.getElementById('livesContainer');
-        this.buySlowTimeBtn = document.getElementById('buySlowTime');
-        this.buyMagnetBtn = document.getElementById('buyMagnet');
         this.buyLifeBtn = document.getElementById('buyLife');
+        
+        // NEW: Аудиоэлементы и управление звуком
+        this.bgm = document.getElementById('bgm');
+        this.sfxCatch = document.getElementById('sfx-catch');
+        this.sfxMiss = document.getElementById('sfx-miss');
+        this.sfxGameOver = document.getElementById('sfx-gameover');
+        this.soundIconEl = document.getElementById('soundToggleButton').querySelector('span'); // Находим span внутри кнопки
+
+        this.isSoundEnabled = this.loadSoundState(); 
+
+        this.updateSoundIcon(); // Обновление иконки при запуске
 
         this.loadState();
         this.updateUI();
         this.setupControls();
+    }
+    
+    // NEW: Загрузка/Сохранение состояния звука
+    loadSoundState() {
+        // По умолчанию звук включен, если нет сохраненного состояния
+        const savedState = localStorage.getItem('cw_sound_enabled');
+        return savedState === null ? true : savedState === 'true';
+    }
+
+    saveSoundState() {
+        localStorage.setItem('cw_sound_enabled', this.isSoundEnabled);
+    }
+
+    updateSoundIcon() {
+        this.soundIconEl.textContent = this.isSoundEnabled ? '🔊' : '🔇';
+    }
+    
+    toggleSound = () => {
+        this.isSoundEnabled = !this.isSoundEnabled;
+        this.saveSoundState();
+        this.updateSoundIcon();
+        this.handleMusic(); 
     }
 
     loadState() {
@@ -142,19 +173,44 @@ class CryptoWolfGame {
         const mult = 1 + Math.min(this.comboCount, 20) * 0.05;
         this.multiplierEl.textContent = mult.toFixed(1);
         
-        const slowTimeCost = parseInt(this.buySlowTimeBtn.dataset.cost);
-        const magnetCost = parseInt(this.buyMagnetBtn.dataset.cost);
-        const lifeCost = parseInt(this.buyLifeBtn.dataset.cost);
-
-        const canBuyBonus = this.gameState === 'playing'; 
-        
-        this.buySlowTimeBtn.disabled = this.balance < slowTimeCost || this.slowTimeDuration > 0 || !canBuyBonus;
-        this.buyMagnetBtn.disabled = this.balance < magnetCost || this.magnetDuration > 0 || !canBuyBonus;
-        this.buyLifeBtn.disabled = this.balance < lifeCost || this.lives >= MAX_LIVES; 
+        // Обновление состояния кнопки жизни
+        if (this.buyLifeBtn) {
+            const lifeCost = parseInt(this.buyLifeBtn.dataset.cost);
+            this.buyLifeBtn.disabled = this.balance < lifeCost || this.lives >= MAX_LIVES; 
+        }
         
         this.updateLivesDisplay();
     }
     
+    // NEW: Метод для управления фоновой музыкой
+    handleMusic() {
+        if (!this.bgm) return;
+
+        if (this.gameState === 'playing' && this.isSoundEnabled) {
+            // Если звук включен и игра идет, пытаемся воспроизвести
+            if (this.bgm.paused) {
+                 this.bgm.play().catch(e => {
+                    // Игнорируем ошибку, если пользователь не кликнул
+                });
+            }
+        } else {
+            // Если игра не идет или звук выключен
+            this.bgm.pause();
+        }
+    }
+    
+    // NEW: Воспроизведение SFX
+    playSfx(sfxElement) {
+        if (this.isSoundEnabled && sfxElement) {
+            sfxElement.currentTime = 0;
+            sfxElement.play().catch(e => {
+                // Игнорируем ошибку, если пользователь не кликнул
+                if (e.name === 'NotAllowedError') return;
+            });
+        }
+    }
+
+
     togglePause = () => {
         if (this.gameState === 'playing') {
             this.gameState = 'paused';
@@ -166,14 +222,10 @@ class CryptoWolfGame {
             this.statusTextEl.textContent = 'Игра возобновлена.';
         }
         this.updateUI();
+        this.handleMusic(); 
     }
 
     purchaseItem(item, cost) {
-        if (this.gameState !== 'playing' && item !== 'life') {
-            this.statusTextEl.textContent = `Сначала запустите игру!`;
-            return false;
-        }
-
         if (this.balance >= cost) {
             this.balance -= cost;
             this.saveState();
@@ -181,15 +233,8 @@ class CryptoWolfGame {
             if (item === 'life') {
                 this.lives = Math.min(this.lives + 1, MAX_LIVES);
                 this.statusTextEl.textContent = `❤️ +1 жизнь куплена!`;
-            } else if (item === 'slowtime') {
-                this.slowTimeDuration = BONUS_TIME;
-                this.statusTextEl.textContent = `🐢 Активировано замедление (10с)!`;
-            } else if (item === 'magnet') {
-                this.magnetDuration = BONUS_TIME;
-                this.wolf.setMagnet(true);
-                this.statusTextEl.textContent = `🧲 Активирован магнит (10с)!`;
             }
-
+            
             if (item === 'life' && this.gameState === 'gameover') {
                 this.startGame();
             }
@@ -230,7 +275,8 @@ class CryptoWolfGame {
         });
         this.pauseButton.addEventListener('click', this.togglePause);
         
-        // Обработчики покупок перенесены в index.html, чтобы иметь доступ к GAME после инициализации
+        // NEW: Добавление обработчика для кнопки звука
+        document.getElementById('soundToggleButton').addEventListener('click', this.toggleSound);
     }
 
     startGame() {
@@ -251,26 +297,42 @@ class CryptoWolfGame {
       this.pauseButton.style.display = 'inline-flex';
       this.pauseIcon.textContent = '⏸';
       this.updateUI();
+      
+      // Активация музыки
+      this.handleMusic();
     }
 
-    // ИЗМЕНЕН СПАУНРЕЙТ ЗОЛОТОГО ТОКЕНА
     spawnObject() {
-        const currentSpeed = this.initialTokenSpeed + Math.floor(this.score / 15) * 0.1; 
-        
-        const rand = Math.random();
-        let newObject;
+        // Плавное увеличение скорости
+        const currentSpeed = this.initialTokenSpeed + Math.min(this.score / 2, 2.5); 
 
-        // Шанс 10% для Золотого Токена после 10 очков
-        if (this.score >= 10 && rand < 0.10) { 
-            newObject = new GoldenToken(W, H, currentSpeed * 0.9);
-        } 
-        // Шанс 10% для Черепа (от 0.10 до 0.20) после 5 очков
-        else if (this.score >= 5 && rand < 0.20) { 
-            newObject = new SkullToken(W, H, currentSpeed * 1.2);
-        } 
-        // Остальное - Обычный Токен (80% шанса)
-        else { 
-            newObject = new CoinToken(W, H, currentSpeed);
+        let newObject = null;
+        let rand = Math.random();
+        
+        // 1. Попытка создания бонуса (если не активны и набран минимальный счет)
+        if (this.score >= 20 && this.slowTimeDuration === 0 && rand < 0.015) { // 1.5% шанс
+            newObject = new SlowTimeBonus(W, H, currentSpeed * 0.8);
+        }
+        else if (this.score >= 30 && this.magnetDuration === 0 && rand >= 0.015 && rand < 0.03) { // 1.5% шанс
+            newObject = new MagnetBonus(W, H, currentSpeed * 0.8);
+        }
+
+        // 2. Если бонус не создан, выбираем токен/череп
+        if (!newObject) {
+            rand = Math.random(); // Новый случайный выбор
+            
+            // 10% для Золотого Токена (после 10 очков)
+            if (this.score >= 10 && rand < 0.10) { 
+                newObject = new GoldenToken(W, H, currentSpeed * 0.9);
+            } 
+            // 10% для Черепа (после 5 очков)
+            else if (this.score >= 5 && rand < 0.20) { 
+                newObject = new SkullToken(W, H, currentSpeed * 1.2);
+            } 
+            // Остальное - Обычный Токен (80% шанса)
+            else { 
+                newObject = new CoinToken(W, H, currentSpeed);
+            }
         }
         
         this.fallingObjects.push(newObject);
@@ -298,6 +360,7 @@ class CryptoWolfGame {
       }
 
       this.tokenSpawnCounter++;
+      // Уменьшаем интервал спауна с ростом счета (минимальный интервал 30)
       const spawnRate = 90 - Math.min(this.score / 3, 60); 
       if (this.tokenSpawnCounter >= spawnRate) {
           this.spawnObject();
@@ -321,16 +384,18 @@ class CryptoWolfGame {
       });
     }
     
-    // ИЗМЕНЕНА ЛОГИКА ПРОМАХА: ЧЕРЕП НЕ СНИЖАЕТ ЖИЗНЬ
     handleObjectMissed(obj) {
         this.comboCount = 0; 
         
         if (obj.type === 'coin' || obj.type === 'golden') {
             this.lives -= 1;
             this.statusTextEl.textContent = `Упущен токен! Осталось жизней: ${this.lives}`;
+            this.playSfx(this.sfxMiss);
+
         } else if (obj.type === 'skull') {
-            // Если пропущен череп - ничего не происходит, жизнь не убавляется.
             this.statusTextEl.textContent = `💀 Опасный токен прошел мимо. Повезло.`; 
+        } else if (obj.type === 'slowtime' || obj.type === 'magnet') {
+            this.statusTextEl.textContent = `Упущен бонус.`; 
         }
 
         this.updateUI();
@@ -340,11 +405,11 @@ class CryptoWolfGame {
         }
     }
 
-    // ЛОГИКА ПОИМКИ (КОРРЕКТНО)
     handleObjectCaught(obj) {
         this.comboCount++;
         const multiplier = 1 + Math.min(this.comboCount, 20) * 0.05;
-        
+        let sfxToPlay = this.sfxCatch; // По умолчанию - звук поимки
+
         if (obj.type === 'coin') {
             this.score += 1 * multiplier;
             this.balance += 1;
@@ -354,12 +419,30 @@ class CryptoWolfGame {
             this.balance += 10;
             this.statusTextEl.textContent = `✨ ЗОЛОТО! +10 TOK, +10 очков! Комбо x${multiplier.toFixed(1)}`;
         } else if (obj.type === 'skull') {
+            // --- ГЛАВНОЕ ИСПРАВЛЕНИЕ: МИНУС ЖИЗНЬ ---
             this.balance = Math.max(0, this.balance - 20);
+            this.lives -= 1; 
             this.comboCount = 0;
-            this.statusTextEl.textContent = `💀 Опасность! Потеряно 20 TOK.`;
+            this.statusTextEl.textContent = `💀 Опасность! Потеряно 20 TOK и 1 жизнь!`; 
+            sfxToPlay = this.sfxMiss; // Звук промаха
+        } else if (obj.type === 'slowtime') { 
+            this.slowTimeDuration = BONUS_TIME;
+            this.comboCount = 0;
+            this.statusTextEl.textContent = `🐢 Активировано замедление (10с) от бонуса!`;
+        } else if (obj.type === 'magnet') { 
+            this.magnetDuration = BONUS_TIME;
+            this.wolf.setMagnet(true);
+            this.comboCount = 0;
+            this.statusTextEl.textContent = `🧲 Активирован магнит (10с) от бонуса!`;
         }
         
+        this.playSfx(sfxToPlay); // Воспроизводим выбранный SFX
         this.updateUI();
+
+        // Проверяем, не закончилась ли игра после потери жизни
+        if (this.lives <= 0) {
+            this.endGame();
+        }
     }
 
     endGame() {
@@ -374,6 +457,9 @@ class CryptoWolfGame {
       this.pauseButton.style.display = 'none';
       this.saveState(); 
       this.updateUI(); 
+      
+      this.handleMusic(); 
+      this.playSfx(this.sfxGameOver);
     }
 
     drawGame() {
@@ -409,6 +495,7 @@ class CryptoWolfGame {
         let bonusCount = (this.slowTimeDuration > 0 ? 1 : 0) + (this.magnetDuration > 0 ? 1 : 0);
         
         if (bonusCount > 0) {
+            // Фон для таймеров
             ctx.fillStyle = 'rgba(0,0,0,0.85)'; 
             ctx.fillRect(W - (60 * bonusCount) - 10, 5, 60 * bonusCount + 10, 30); 
         }
@@ -425,32 +512,51 @@ class CryptoWolfGame {
         }
 
 
-        // Отображение состояния (Menu/Game Over/Paused)
+        // NEW: Переработанный блок сообщений
         if (this.gameState !== 'playing') {
-            ctx.fillStyle = 'rgba(15,23,42,0.85)';
-            ctx.fillRect(W/2 - 140, H/2 - 50, 280, 100);
-            ctx.strokeStyle = uiColor;
-            ctx.strokeRect(W/2 - 139.5, H/2 - 49.5, 279, 99);
+            const centerX = W / 2;
+            const centerY = H / 2;
+            const boxWidth = 280;
+            const boxHeight = 110;
 
-            ctx.fillStyle = uiColor;
-            ctx.font = '20px monospace';
+            // Фон сообщения
+            ctx.fillStyle = 'rgba(15,23,42,0.9)';
+            ctx.fillRect(centerX - boxWidth/2, centerY - boxHeight/2, boxWidth, boxHeight);
+            
+            // Рамка
+            ctx.strokeStyle = uiColor;
+            ctx.lineWidth = 1.5;
+            ctx.strokeRect(centerX - boxWidth/2, centerY - boxHeight/2, boxWidth, boxHeight);
+
+            ctx.textAlign = 'center'; // Выравнивание текста по центру
+
+            // Заголовок
+            ctx.font = '24px monospace';
+            ctx.fillStyle = getCssVar('--canvas-token-color');
+            let title = '';
+            let subtitle1 = '';
+            let subtitle2 = '';
+
             if (this.gameState === 'menu') {
-                ctx.fillText('CRYPTO WOLF', W/2 - 65, H/2 - 15);
-                ctx.font = '14px monospace';
-                ctx.fillText('Нажми "Старт" или кликни', W/2 - 95, H/2 + 10);
-                ctx.fillText('по экрану, чтобы начать', W/2 - 95, H/2 + 30);
+                title = 'CRYPTO WOLF';
+                subtitle1 = 'Нажми "Старт" или кликни по экрану';
             } else if (this.gameState === 'gameover') {
-                ctx.fillStyle = getCssVar('--canvas-token-color');
-                ctx.fillText('GAME OVER', W/2 - 50, H/2 - 15);
-                ctx.fillStyle = uiColor;
-                ctx.font = '14px monospace';
-                ctx.fillText(`Поймано токенов: ${Math.floor(this.score)}`, W/2 - 80, H/2 + 10);
-                ctx.fillText('Нажми "Играть снова"', W/2 - 80, H/2 + 30);
+                title = 'GAME OVER';
+                subtitle1 = `Поймано токенов: ${Math.floor(this.score)}`;
+                subtitle2 = 'Нажми "Играть снова"';
             } else if (this.gameState === 'paused') {
-                ctx.fillText('ПАУЗА', W/2 - 35, H/2 - 15);
-                ctx.font = '14px monospace';
-                ctx.fillText('Нажми ▶ или кликни,', W/2 - 80, H/2 + 10);
-                ctx.fillText('чтобы продолжить', W/2 - 75, H/2 + 30);
+                title = 'ПАУЗА';
+                subtitle1 = 'Нажми ▶ или кликни, чтобы продолжить';
+            }
+            
+            ctx.fillText(title, centerX, centerY - 20);
+
+            // Подзаголовки
+            ctx.fillStyle = uiColor;
+            ctx.font = '12px monospace';
+            ctx.fillText(subtitle1, centerX, centerY + 10);
+            if (subtitle2) {
+                ctx.fillText(subtitle2, centerX, centerY + 35);
             }
         }
     }
